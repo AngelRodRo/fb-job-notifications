@@ -145,6 +145,7 @@
       "resolved": "https://registry.npmjs.org/isarray/-/isarray-1.0.0.tgz",
       "version": "1.0.0"
     },
+    "jsonfile": "^5.0.0",
     "mime": {
       "integrity": "sha512-n9ChLv77+QQEapYz8lV+rIZAW3HhAPW2CXnzb1GN5uMkuczshwvkW7XPsbzU0ZQN3sP47Er2KVkp2p3KyqZKSQ==",
       "resolved": "https://registry.npmjs.org/mime/-/mime-1.4.0.tgz",
