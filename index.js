@@ -1,10 +1,7 @@
 const puppeteer = require('puppeteer');
 const CRED = require('./creds');
-const jsonfile = require('jsonfile');
-const path = require('path');
-const fs = require('fs');
+const cookies = require('./utils/cookies');
 
-const cookiesFilePath = './cookies.json';
 const sleep = async (ms) => {
   return new Promise((res, rej) => {
     setTimeout(() => {
@@ -13,28 +10,8 @@ const sleep = async (ms) => {
   });
 }
 
-const saveCookies =  async (page) => {
-  const cookiesObject = await page.cookies()
-  jsonfile.writeFileSync(path.resolve(__dirname, cookiesFilePath), cookiesObject, { spaces: 2 });
-}
-
-const retrieveCookies = async (page) => {
-  const previousSession = fs.existsSync(path.resolve(__dirname, cookiesFilePath))
-  if (previousSession) {
-    // If file exist load the cookies
-    const cookiesArr = require(`./cookies.json`)
-    if (cookiesArr.length !== 0) {
-      for (let cookie of cookiesArr) {
-        await page.setCookie(cookie)
-      }
-      console.log('Session has been loaded in the browser')
-      return true
-    }
-  }
-}
-
 const gotoLogged = async (page, url) => {
-  await retrieveCookies(page);
+  await cookies.retrieveCookies(page);
   await page.goto(url, {
     waitUntil: 'networkidle2'
   });
@@ -46,6 +23,8 @@ const ID = {
 };
 
 //const postSelector = '_4-u2 mbm _4mrt _5jmm _5pat _5v3q _7cqq _4-u8';
+
+const filterPostsByKeywords = (posts, keywords = ["perrito", "perro"]) => keywords.reduce((filteredPosts, keyword) => [...filteredPosts, ...(posts.filter(post => post.content.includes(keyword)) || [])], []);
 
 const getPosts = async (page) => {
   const posts = await page.evaluate(() => {
@@ -92,11 +71,11 @@ const getPosts = async (page) => {
 
     await page.click("#loginbutton");
     await page.waitForNavigation();
-    await saveCookies(page);
+    await cookies.saveCookies(page);
     await gotoLogged(page, `${fbUrl}/groups/737377046643578/`);
-    await retrieveCookies(page);
+    await cookies.retrieveCookies(page);
     const posts = await getPosts(page);
-    console.log(posts);
+    console.log(filterPostsByKeywords(posts));
     await page.waitForNavigation();
   }
   await login();
