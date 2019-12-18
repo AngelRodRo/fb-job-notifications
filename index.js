@@ -50,19 +50,19 @@ const ID = {
 const getPosts = async (page) => {
   const posts = await page.evaluate(() => {
     let posts = [];
-    const contentArray = document.querySelectorAll('[data-testid=post_message] p');
+    const contentArray = document.querySelectorAll('[data-testid=post_message]');
     const dateArray = document.querySelectorAll('[id^=mall_post_] .clearfix [id^=feed_subtitle] abbr');
-    const profileArray = document.querySelectorAll("[id^=mall_post_] .fwb > .profileLink")
+    //const profileArray = document.querySelectorAll("[id^=mall_post_] .fwb > .profileLink")
     const linkArray = document.querySelectorAll('[id^=mall_post_] .clearfix [id^=feed_subtitle] ._5pcq');
 
     const length = contentArray.length;
 
     for (let i = 0; i < length; i++) {
       posts[i] = {
-        profile: profileArray[i],
+        //profile: profileArray[i].textContent,
         content: contentArray[i].textContent,
-        date: dateArray[i].getAttribute("title"),
-        link: 'https://facebook.com' + linkArray[i].getAttribute("href")
+        date: dateArray[i] && dateArray[i].getAttribute("title"),
+        link: linkArray[i] && 'https://facebook.com' + linkArray[i].getAttribute("href")
       };
     }
     return posts;
@@ -95,7 +95,8 @@ const getPosts = async (page) => {
     await saveCookies(page);
     await gotoLogged(page, `${fbUrl}/groups/737377046643578/`);
     await retrieveCookies(page);
-    await getPosts(page);
+    const posts = await getPosts(page);
+    console.log(posts);
     await page.waitForNavigation();
   }
   await login();
