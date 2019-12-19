@@ -8,12 +8,12 @@ const UserSchema = new Schema({
         required: "Username is required"
     },
     email: {
-        type:String,
+        type: String,
         unique: true,
         required: "Email is required"
     },
     password: {
-        type:String,
+        type: String,
         required: "Password is required"
     },
     keywords: {
