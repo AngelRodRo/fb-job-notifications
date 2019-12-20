@@ -1,7 +1,13 @@
 const mongoose = require("mongoose");
+const { exists, findOrCreate } = require("../utils/models");
 const { Schema } = mongoose;
 
 const PostSchema = new Schema({
+    postId: {
+        type: String,
+        unique: true,
+        required: "PostId is required"
+    },
     groupId: {
         type: String,
         required: "Group is required"
@@ -24,5 +30,8 @@ const PostSchema = new Schema({
 });
 
 const Post = mongoose.model("Post", PostSchema);
+
+Post.exists = (filter) => exists(Post, filter);
+Post.findOrCreate = (filter, data) => findOrCreate(Post, filter, data);
 
 module.exports = Post;

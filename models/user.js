@@ -16,10 +16,10 @@ const UserSchema = new Schema({
         type: String,
         required: "Password is required"
     },
-    keywords: {
-        type: "Array",
-        default: []
-    },
+    keywords: [{
+        type: mongoose.Schema.Keyword.ObjectId,
+        ref: 'Keyword'
+    }],
     createdAt: {
         type: Date,
         default: Date.now
@@ -27,5 +27,8 @@ const UserSchema = new Schema({
 });
 
 const User = mongoose.model("User", UserSchema);
+
+User.exists = (filter) => exists(User, filter);
+User.findOrCreate = (filter, data) => findOrCreate(User, filter, data);
 
 module.exports = User;
