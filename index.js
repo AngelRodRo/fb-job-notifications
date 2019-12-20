@@ -1,6 +1,27 @@
 const puppeteer = require('puppeteer');
 const CRED = require('./creds');
 const cookies = require('./utils/cookies');
+const notifier = require('node-notifier');
+
+const showNotification = (content, url) => {
+
+  notifier.notify(content);
+  notifier.on('click', (obj, options) => {
+    const spawn = require('child_process').spawn;
+    spawn('open', [url]);
+  });
+
+  // // Object
+  // notifier.notify({
+  //   'title': 'David Walsh Blog',
+  //   'subtitle': 'Daily Maintenance',
+  //   'message': 'Go approve comments in moderation!',
+  //   'icon': 'dwb-logo.png',
+  //   'contentImage': 'blog.png',
+  //   'sound': 'ding.mp3',
+  //   'wait': true
+  // });
+}
 
 const sleep = async (ms) => {
   return new Promise((res, rej) => {
@@ -35,7 +56,7 @@ const getAttrValueBySelector =  async (parent, selector, attr) => {
   }
 }
 
-const filterPostsByKeywords = (posts, keywords = []) => keywords.reduce((filteredPosts, keyword) => [...filteredPosts, ...(posts.filter(post => post.content.includes(keyword)) || [])], []);
+const filterPostsByKeywords = (posts, keywords = []) => keywords.reduce((filteredPosts, keyword) => [...filteredPosts, ...(posts.filter(post => post.content.toLowerCase().includes(keyword)) || [])], []);
 
 const getPosts = async (page) => {
   try {
@@ -45,10 +66,10 @@ const getPosts = async (page) => {
       const content = await getAttrValueBySelector(postElement, '[data-testid=post_message]', 'textContent');
       const date = await getAttrValueBySelector(postElement, '[id^=mall_post_] .clearfix [id^=feed_subtitle] abbr', 'title');
       const link = await getAttrValueBySelector(postElement, '[id^=mall_post_] .clearfix [id^=feed_subtitle] ._5pcq', 'href');
-
+      const paths = link.split("/");
       posts.push({
-        postId: link.split("/").slice(0, -1).pop(),
-        groupId: link.split("/").slice(0, -3).pop(),
+        postId: paths.slice(0, -1).pop(),
+        groupId: paths.slice(0, -3).pop(),
         content,
         date,
         link
@@ -60,28 +81,7 @@ const getPosts = async (page) => {
   }
 }
 
-// const getPosts = async (page) => {
-//   const posts = await page.evaluate(() => {
-//     let posts = [];
-//     const contentArray = document.querySelectorAll('[data-testid=post_message]');
-//     const dateArray = document.querySelectorAll('[id^=mall_post_] .clearfix [id^=feed_subtitle] abbr');
-//     //const profileArray = document.querySelectorAll("[id^=mall_post_] .fwb > .profileLink")
-//     const linkArray = document.querySelectorAll('[id^=mall_post_] .clearfix [id^=feed_subtitle] ._5pcq');
-
-//     const length = contentArray.length;
-
-//     for (let i = 0; i < length; i++) {
-//       posts[i] = {
-//         //profile: profileArray[i].textContent,
-//         content: contentArray[i].textContent,
-//         date: dateArray[i] && dateArray[i].getAttribute("title"),
-//         link: linkArray[i] && 'https://facebook.com' + linkArray[i].getAttribute("href")
-//       };
-//     }
-//     return posts;
-//   });
-//   return posts;
-// }
+const groupIds = ['737377046643578'];
 
 (async () => {
   const browser = await puppeteer.launch({
@@ -91,21 +91,7 @@ const getPosts = async (page) => {
   const fbUrl = 'https://facebook.com';
   const page = await browser.newPage();
 
-  // const notifier = require('node-notifier');
-
-  // // String
-  // notifier.notify('Go empty the dishwasher!');
-
-  // // Object
-  // notifier.notify({
-  //   'title': 'David Walsh Blog',
-  //   'subtitle': 'Daily Maintenance',
-  //   'message': 'Go approve comments in moderation!',
-  //   'icon': 'dwb-logo.png',
-  //   'contentImage': 'blog.png',
-  //   'sound': 'ding.mp3',
-  //   'wait': true
-  // });
+  showNotification();
   const login = async () => {
     // login
     await page.goto(fbUrl, {
@@ -126,15 +112,24 @@ const getPosts = async (page) => {
 
     //setInterval(async () => {
       console.log("==============================");
-      await gotoLogged(page, `${fbUrl}/groups/737377046643578/`);
-      const posts = await getPosts(page);
-      console.log(posts)
-      //console.log(filterPostsByKeywords(posts, keywords));
-      console.log("==============================");
-      await page.waitForNavigation();
+      for (const groupId of groupIds) {
+        try {
+          await gotoLogged(page, `${fbUrl}/groups/${groupId}/`);
+          const posts = await getPosts(page);
+          for (const post of posts) {
+            showNotification(post.content, post.link);
+          }
+          const filteredPosts = filterPostsByKeywords(posts, keywords);
+          console.log(filteredPosts);
+          console.log("==============================");
+          //await page.waitForNavigation();
+        } catch (e) {
+          console.log(e)
+        }
+      }
     //},  60 * 1000);
   }
   await login();
-  await page.waitForNavigation();
+  //await page.waitForNavigation();
 
 })();
