@@ -91,7 +91,7 @@ const groupIds = ['737377046643578'];
   const fbUrl = 'https://facebook.com';
   const page = await browser.newPage();
 
-  showNotification();
+  //showNotification();
   const login = async () => {
     // login
     await page.goto(fbUrl, {
