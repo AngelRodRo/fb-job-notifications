@@ -4,6 +4,7 @@
   "private": true,
   "dependencies": {
     "jsonfile": "^5.0.0",
+    "node-cron": "^2.0.3",
     "node-notifier": "^6.0.0",
     "puppeteer": "^2.0.0"
   }

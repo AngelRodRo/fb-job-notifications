@@ -3,24 +3,32 @@ const CRED = require('./creds');
 const cookies = require('./utils/cookies');
 const notifier = require('node-notifier');
 
-const showNotification = (content, url) => {
+const jsonfile = require('jsonfile');
+const path = require('path');
+const fs = require('fs');
+const cron = require('node-cron');
 
-  notifier.notify(content);
+const postSelector = '._4-u2.mbm._4mrt._5jmm._5pat._5v3q._7cqq._4-u8';
+const fbUrl = 'https://facebook.com';
+
+const savePosts = (newPosts) => {
+  console.log("Saving posts....");
+  const previousPostsExists = fs.existsSync(path.resolve(__dirname, 'posts.json'));
+  const posts = [];
+  if (previousPostsExists) {
+    const previousPosts = require('./posts.json');
+    posts.push(...previousPosts);
+  }
+  posts.push(...newPosts);
+  jsonfile.writeFileSync(path.resolve(__dirname, 'posts.json'), posts, { spaces: 2 });
+  console.log("Posts saved!");
+};
+
+const showNotification = () => {
+  notifier.notify('Se encontraron nuevas coincidencias!');
   notifier.on('click', (obj, options) => {
     const spawn = require('child_process').spawn;
-    spawn('open', [url]);
   });
-
-  // // Object
-  // notifier.notify({
-  //   'title': 'David Walsh Blog',
-  //   'subtitle': 'Daily Maintenance',
-  //   'message': 'Go approve comments in moderation!',
-  //   'icon': 'dwb-logo.png',
-  //   'contentImage': 'blog.png',
-  //   'sound': 'ding.mp3',
-  //   'wait': true
-  // });
 }
 
 const sleep = async (ms) => {
@@ -43,7 +51,6 @@ const ID = {
   pass: '#pass'
 };
 
-const postSelector = '._4-u2.mbm._4mrt._5jmm._5pat._5v3q._7cqq._4-u8';
 
 const getAttrValueBySelector =  async (parent, selector, attr) => {
   try {
@@ -57,7 +64,6 @@ const getAttrValueBySelector =  async (parent, selector, attr) => {
 }
 
 const filterPostsByKeywords = (posts, keywords = []) => keywords.reduce((filteredPosts, keyword) => [...filteredPosts, ...(posts.filter(post => post.content.toLowerCase().includes(keyword)) || [])], []);
-
 const getPosts = async (page) => {
   try {
     const posts = [];
@@ -81,25 +87,36 @@ const getPosts = async (page) => {
   }
 }
 
-const groupIds = ['737377046643578'];
-
+const checkGroupsByKeywords = async (page, groupIds, keywords) => {
+  for (const groupId of groupIds) {
+    try {
+      await gotoLogged(page, `${fbUrl}/groups/${groupId}/`);
+      const posts = await getPosts(page);
+      const filteredPosts = filterPostsByKeywords(posts, keywords);
+      if (filteredPosts.length > 0) {
+        savePosts(filteredPosts);
+        showNotification();
+      }
+      //await page.waitForNavigation();
+    } catch (e) {
+      console.log(e)
+    }
+  }
+}
 (async () => {
   const browser = await puppeteer.launch({
     headless: true,
     args: ['--no-sandbox', '--disable-setuid-sandbox']
   });
-  const fbUrl = 'https://facebook.com';
   const page = await browser.newPage();
-
-  //showNotification();
+  const groupIds = require('./groups.json');
   const login = async () => {
-    // login
     await page.goto(fbUrl, {
       waitUntil: 'domcontentloaded'
     });
 
     const keywords = process.argv.slice(2);
-    console.log(keywords)
+    console.log(keywords);
     await page.waitForSelector(ID.login);
     await page.type(ID.login, CRED.user);
 
@@ -110,26 +127,9 @@ const groupIds = ['737377046643578'];
     await page.waitForNavigation();
     await cookies.saveCookies(page);
 
-    //setInterval(async () => {
-      console.log("==============================");
-      for (const groupId of groupIds) {
-        try {
-          await gotoLogged(page, `${fbUrl}/groups/${groupId}/`);
-          const posts = await getPosts(page);
-          for (const post of posts) {
-            showNotification(post.content, post.link);
-          }
-          const filteredPosts = filterPostsByKeywords(posts, keywords);
-          console.log(filteredPosts);
-          console.log("==============================");
-          //await page.waitForNavigation();
-        } catch (e) {
-          console.log(e)
-        }
-      }
-    //},  60 * 1000);
+    cron.schedule('*/1 * * * *', () => {
+      checkGroupsByKeywords(page, groupIds, keywords);
+    });
   }
   await login();
-  //await page.waitForNavigation();
-
 })();

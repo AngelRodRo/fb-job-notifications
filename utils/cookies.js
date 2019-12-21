@@ -14,11 +14,10 @@ const retrieveCookies = async (page) => {
         // If file exist load the cookies
         const cookiesArr = require(`../cookies.json`)
         if (cookiesArr.length !== 0) {
-        for (let cookie of cookiesArr) {
-            await page.setCookie(cookie)
-        }
-        console.log('Session has been loaded in the browser')
-        return true
+            for (let cookie of cookiesArr) {
+                await page.setCookie(cookie)
+            }
+            return true
         }
     }
 }
