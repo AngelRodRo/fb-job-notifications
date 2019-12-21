@@ -11,17 +11,33 @@ const cron = require('node-cron');
 const postSelector = '._4-u2.mbm._4mrt._5jmm._5pat._5v3q._7cqq._4-u8';
 const fbUrl = 'https://facebook.com';
 
+
 const savePosts = (newPosts) => {
-  console.log("Saving posts....");
-  const previousPostsExists = fs.existsSync(path.resolve(__dirname, 'posts.json'));
+  const postsPath = path.resolve(__dirname, 'posts.json');
+  const previousPostsExists = fs.existsSync(postsPath);
   const posts = [];
+  let edited = false;
+
   if (previousPostsExists) {
-    const previousPosts = require('./posts.json');
+    const previousPosts = JSON.parse(fs.readFileSync(postsPath, "utf8"));
     posts.push(...previousPosts);
   }
-  posts.push(...newPosts);
-  jsonfile.writeFileSync(path.resolve(__dirname, 'posts.json'), posts, { spaces: 2 });
-  console.log("Posts saved!");
+
+
+  for (const newPost of newPosts) {
+    const foundPost = posts.find(post => post.postId === newPost.postId);
+    if (!foundPost) {
+      edited = true;
+      posts.push(newPost);
+    }
+  }
+
+  if (edited) {
+    console.log("Saving posts....");
+    jsonfile.writeFileSync(path.resolve(__dirname, 'posts.json'), posts, { spaces: 2 });
+    showNotification();
+    console.log("Posts saved!");
+  }
 };
 
 const showNotification = () => {
@@ -95,13 +111,19 @@ const checkGroupsByKeywords = async (page, groupIds, keywords) => {
       const filteredPosts = filterPostsByKeywords(posts, keywords);
       if (filteredPosts.length > 0) {
         savePosts(filteredPosts);
-        showNotification();
       }
-      //await page.waitForNavigation();
     } catch (e) {
       console.log(e)
     }
   }
+}
+
+const watchNewPosts = () => {
+  fs.watch(path.resolve(__dirname, 'posts.json'), { encoding: 'buffer' }, (eventType, filename) => {
+    if (filename) {
+      showNotification();
+    }
+  });
 }
 (async () => {
   const browser = await puppeteer.launch({
@@ -114,6 +136,8 @@ const checkGroupsByKeywords = async (page, groupIds, keywords) => {
     await page.goto(fbUrl, {
       waitUntil: 'domcontentloaded'
     });
+
+    //watchNewPosts();
 
     const keywords = process.argv.slice(2);
     console.log(keywords);
