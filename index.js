@@ -42,9 +42,9 @@ const savePosts = (newPosts) => {
 
 const showNotification = () => {
   notifier.notify('Se encontraron nuevas coincidencias!');
-  notifier.on('click', (obj, options) => {
-    const spawn = require('child_process').spawn;
-  });
+  // notifier.on('click', (obj, options) => {
+  //   const spawn = require('child_process').spawn;
+  // });
 }
 
 const sleep = async (ms) => {
@@ -79,7 +79,30 @@ const getAttrValueBySelector =  async (parent, selector, attr) => {
   }
 }
 
-const filterPostsByKeywords = (posts, keywords = []) => keywords.reduce((filteredPosts, keyword) => [...filteredPosts, ...(posts.filter(post => post.content.toLowerCase().includes(keyword)) || [])], []);
+const filterPostsByKeywords = (posts = [], keywords = []) => {
+  const filteredPosts = [];
+  for (const post of posts) {
+    let coincidences = 0;
+    const requiredKeywords = keywords.slice(0, 2);
+    const remainingKeywords = keywords.slice(2);
+    for (const keyword of requiredKeywords) {
+      if (post.content.includes(keyword)) {
+        coincidences++;
+      }
+    }
+    console.log("requiredKeywords", coincidences);
+
+    if (coincidences >= requiredKeywords.length - 1) {
+      const existCondition = remainingKeywords.some(keyword => post.content.includes(keyword));
+      if (existCondition) {
+        filteredPosts.push(post);
+      }
+    }
+  }
+  return filteredPosts;
+}
+
+//const filterPostsByKeywords = (posts, keywords = []) => keywords.reduce((filteredPosts, keyword) => [...filteredPosts, ...(posts.filter(post => post.content.toLowerCase().includes(keyword)) || [])], []);
 const getPosts = async (page) => {
   try {
     const posts = [];
@@ -88,10 +111,11 @@ const getPosts = async (page) => {
       const content = await getAttrValueBySelector(postElement, '[data-testid=post_message]', 'textContent');
       const date = await getAttrValueBySelector(postElement, '[id^=mall_post_] .clearfix [id^=feed_subtitle] abbr', 'title');
       const link = await getAttrValueBySelector(postElement, '[id^=mall_post_] .clearfix [id^=feed_subtitle] ._5pcq', 'href');
-      const paths = link.split("/");
+      const [,,,, groupId,, postId] = link.split("/");
+
       posts.push({
-        postId: paths.slice(0, -1).pop(),
-        groupId: paths.slice(0, -3).pop(),
+        postId,
+        groupId,
         content,
         date,
         link
@@ -109,6 +133,7 @@ const checkGroupsByKeywords = async (page, groupIds, keywords) => {
       await gotoLogged(page, `${fbUrl}/groups/${groupId}/`);
       const posts = await getPosts(page);
       const filteredPosts = filterPostsByKeywords(posts, keywords);
+      console.log(filteredPosts);
       if (filteredPosts.length > 0) {
         savePosts(filteredPosts);
       }
@@ -151,9 +176,10 @@ const watchNewPosts = () => {
     await page.waitForNavigation();
     await cookies.saveCookies(page);
 
-    cron.schedule('*/1 * * * *', () => {
-      checkGroupsByKeywords(page, groupIds, keywords);
-    });
+    checkGroupsByKeywords(page, groupIds, keywords);
+    // cron.schedule('*/1 * * * *', () => {
+    //   checkGroupsByKeywords(page, groupIds, keywords);
+    // });
   }
   await login();
 })();
