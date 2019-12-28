@@ -10,6 +10,7 @@ const PostSchema = new Schema({
     },
     groupId: {
         type: String,
+        unique: true,
         required: "Group is required"
     },
     content: {

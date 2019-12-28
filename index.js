@@ -12,32 +12,15 @@ const postSelector = '._4-u2.mbm._4mrt._5jmm._5pat._5v3q._7cqq._4-u8';
 const fbUrl = 'https://facebook.com';
 
 
-const savePosts = (newPosts) => {
-  const postsPath = path.resolve(__dirname, 'posts.json');
-  const previousPostsExists = fs.existsSync(postsPath);
-  const posts = [];
-  let edited = false;
-
-  if (previousPostsExists) {
-    const previousPosts = JSON.parse(fs.readFileSync(postsPath, "utf8"));
-    posts.push(...previousPosts);
-  }
+const Post = require("./models/post");
 
 
-  for (const newPost of newPosts) {
-    const foundPost = posts.find(post => post.postId === newPost.postId);
-    if (!foundPost) {
-      edited = true;
-      posts.push(newPost);
-    }
-  }
-
-  if (edited) {
+const savePosts = async (newPosts) => {
     console.log("Saving posts....");
-    jsonfile.writeFileSync(path.resolve(__dirname, 'posts.json'), posts, { spaces: 2 });
+    await Promise.all(newPosts.map(post => Post.findOrCreate(post, { postId: post.postid, groupId: post.groupId })));
+    //jsonfile.writeFileSync(path.resolve(__dirname, 'posts.json'), posts, { spaces: 2 });
     showNotification();
     console.log("Posts saved!");
-  }
 };
 
 const showNotification = () => {
@@ -135,7 +118,7 @@ const checkGroupsByKeywords = async (page, groupIds, keywords) => {
       const filteredPosts = filterPostsByKeywords(posts, keywords);
       console.log(filteredPosts);
       if (filteredPosts.length > 0) {
-        savePosts(filteredPosts);
+        await savePosts(filteredPosts);
       }
     } catch (e) {
       console.log(e)
@@ -150,7 +133,8 @@ const watchNewPosts = () => {
     }
   });
 }
-(async () => {
+module.exports = (async (keywords = process.argv.slice(2)) => {
+  console.log(keywords);
   const browser = await puppeteer.launch({
     headless: true,
     args: ['--no-sandbox', '--disable-setuid-sandbox']
@@ -164,8 +148,6 @@ const watchNewPosts = () => {
 
     //watchNewPosts();
 
-    const keywords = process.argv.slice(2);
-    console.log(keywords);
     await page.waitForSelector(ID.login);
     await page.type(ID.login, CRED.user);
 
@@ -182,4 +164,4 @@ const watchNewPosts = () => {
     // });
   }
   await login();
-})();
+});

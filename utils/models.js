@@ -16,7 +16,7 @@ const findOrCreate = async (model, filter, data) => {
         } else {
             instance = await model.findOne(filter);
         }
-        return [isNew, instance];
+        return instance;
     } catch (error) {
         console.log(error);
     }
