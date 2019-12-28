@@ -12,12 +12,12 @@ const postSelector = '._4-u2.mbm._4mrt._5jmm._5pat._5v3q._7cqq._4-u8';
 const fbUrl = 'https://facebook.com';
 
 
-const Post = require("./models/post");
+const Post = require("./server/models/post");
 
 
 const savePosts = async (newPosts) => {
     console.log("Saving posts....");
-    await Promise.all(newPosts.map(post => Post.findOrCreate(post, { postId: post.postid, groupId: post.groupId })));
+    await Promise.all(newPosts.map(post => Post.findOrCreate(post, { $and: [{ postId: post.postid }, { groupId: post.groupId } ]})));
     //jsonfile.writeFileSync(path.resolve(__dirname, 'posts.json'), posts, { spaces: 2 });
     showNotification();
     console.log("Posts saved!");
@@ -73,7 +73,6 @@ const filterPostsByKeywords = (posts = [], keywords = []) => {
         coincidences++;
       }
     }
-    console.log("requiredKeywords", coincidences);
 
     if (coincidences >= requiredKeywords.length - 1) {
       const existCondition = remainingKeywords.some(keyword => post.content.includes(keyword));
