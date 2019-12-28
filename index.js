@@ -1,6 +1,51 @@
 const puppeteer = require('puppeteer');
 const CRED = require('./creds');
 const cookies = require('./utils/cookies');
+const notifier = require('node-notifier');
+
+const jsonfile = require('jsonfile');
+const path = require('path');
+const fs = require('fs');
+const cron = require('node-cron');
+
+const postSelector = '._4-u2.mbm._4mrt._5jmm._5pat._5v3q._7cqq._4-u8';
+const fbUrl = 'https://facebook.com';
+
+
+const savePosts = (newPosts) => {
+  const postsPath = path.resolve(__dirname, 'posts.json');
+  const previousPostsExists = fs.existsSync(postsPath);
+  const posts = [];
+  let edited = false;
+
+  if (previousPostsExists) {
+    const previousPosts = JSON.parse(fs.readFileSync(postsPath, "utf8"));
+    posts.push(...previousPosts);
+  }
+
+
+  for (const newPost of newPosts) {
+    const foundPost = posts.find(post => post.postId === newPost.postId);
+    if (!foundPost) {
+      edited = true;
+      posts.push(newPost);
+    }
+  }
+
+  if (edited) {
+    console.log("Saving posts....");
+    jsonfile.writeFileSync(path.resolve(__dirname, 'posts.json'), posts, { spaces: 2 });
+    showNotification();
+    console.log("Posts saved!");
+  }
+};
+
+const showNotification = () => {
+  notifier.notify('Se encontraron nuevas coincidencias!');
+  // notifier.on('click', (obj, options) => {
+  //   const spawn = require('child_process').spawn;
+  // });
+}
 
 const sleep = async (ms) => {
   return new Promise((res, rej) => {
@@ -22,7 +67,6 @@ const ID = {
   pass: '#pass'
 };
 
-const postSelector = '._4-u2.mbm._4mrt._5jmm._5pat._5v3q._7cqq._4-u8';
 
 const getAttrValueBySelector =  async (parent, selector, attr) => {
   try {
@@ -35,8 +79,30 @@ const getAttrValueBySelector =  async (parent, selector, attr) => {
   }
 }
 
-const filterPostsByKeywords = (posts, keywords = []) => keywords.reduce((filteredPosts, keyword) => [...filteredPosts, ...(posts.filter(post => post.content.includes(keyword)) || [])], []);
+const filterPostsByKeywords = (posts = [], keywords = []) => {
+  const filteredPosts = [];
+  for (const post of posts) {
+    let coincidences = 0;
+    const requiredKeywords = keywords.slice(0, 2);
+    const remainingKeywords = keywords.slice(2);
+    for (const keyword of requiredKeywords) {
+      if (post.content.includes(keyword)) {
+        coincidences++;
+      }
+    }
+    console.log("requiredKeywords", coincidences);
 
+    if (coincidences >= requiredKeywords.length - 1) {
+      const existCondition = remainingKeywords.some(keyword => post.content.includes(keyword));
+      if (existCondition) {
+        filteredPosts.push(post);
+      }
+    }
+  }
+  return filteredPosts;
+}
+
+//const filterPostsByKeywords = (posts, keywords = []) => keywords.reduce((filteredPosts, keyword) => [...filteredPosts, ...(posts.filter(post => post.content.toLowerCase().includes(keyword)) || [])], []);
 const getPosts = async (page) => {
   try {
     const posts = [];
@@ -45,10 +111,11 @@ const getPosts = async (page) => {
       const content = await getAttrValueBySelector(postElement, '[data-testid=post_message]', 'textContent');
       const date = await getAttrValueBySelector(postElement, '[id^=mall_post_] .clearfix [id^=feed_subtitle] abbr', 'title');
       const link = await getAttrValueBySelector(postElement, '[id^=mall_post_] .clearfix [id^=feed_subtitle] ._5pcq', 'href');
+      const [,,,, groupId,, postId] = link.split("/");
 
       posts.push({
-        postId: link.split("/").slice(0, -1).pop(),
-        groupId: link.split("/").slice(0, -3).pop(),
+        postId,
+        groupId,
         content,
         date,
         link
@@ -60,60 +127,45 @@ const getPosts = async (page) => {
   }
 }
 
-// const getPosts = async (page) => {
-//   const posts = await page.evaluate(() => {
-//     let posts = [];
-//     const contentArray = document.querySelectorAll('[data-testid=post_message]');
-//     const dateArray = document.querySelectorAll('[id^=mall_post_] .clearfix [id^=feed_subtitle] abbr');
-//     //const profileArray = document.querySelectorAll("[id^=mall_post_] .fwb > .profileLink")
-//     const linkArray = document.querySelectorAll('[id^=mall_post_] .clearfix [id^=feed_subtitle] ._5pcq');
+const checkGroupsByKeywords = async (page, groupIds, keywords) => {
+  for (const groupId of groupIds) {
+    try {
+      await gotoLogged(page, `${fbUrl}/groups/${groupId}/`);
+      const posts = await getPosts(page);
+      const filteredPosts = filterPostsByKeywords(posts, keywords);
+      console.log(filteredPosts);
+      if (filteredPosts.length > 0) {
+        savePosts(filteredPosts);
+      }
+    } catch (e) {
+      console.log(e)
+    }
+  }
+}
 
-//     const length = contentArray.length;
-
-//     for (let i = 0; i < length; i++) {
-//       posts[i] = {
-//         //profile: profileArray[i].textContent,
-//         content: contentArray[i].textContent,
-//         date: dateArray[i] && dateArray[i].getAttribute("title"),
-//         link: linkArray[i] && 'https://facebook.com' + linkArray[i].getAttribute("href")
-//       };
-//     }
-//     return posts;
-//   });
-//   return posts;
-// }
-
+const watchNewPosts = () => {
+  fs.watch(path.resolve(__dirname, 'posts.json'), { encoding: 'buffer' }, (eventType, filename) => {
+    if (filename) {
+      showNotification();
+    }
+  });
+}
 (async () => {
   const browser = await puppeteer.launch({
     headless: true,
     args: ['--no-sandbox', '--disable-setuid-sandbox']
   });
-  const fbUrl = 'https://facebook.com';
   const page = await browser.newPage();
-
-  // const notifier = require('node-notifier');
-
-  // // String
-  // notifier.notify('Go empty the dishwasher!');
-
-  // // Object
-  // notifier.notify({
-  //   'title': 'David Walsh Blog',
-  //   'subtitle': 'Daily Maintenance',
-  //   'message': 'Go approve comments in moderation!',
-  //   'icon': 'dwb-logo.png',
-  //   'contentImage': 'blog.png',
-  //   'sound': 'ding.mp3',
-  //   'wait': true
-  // });
+  const groupIds = require('./groups.json');
   const login = async () => {
-    // login
     await page.goto(fbUrl, {
       waitUntil: 'domcontentloaded'
     });
 
+    //watchNewPosts();
+
     const keywords = process.argv.slice(2);
-    console.log(keywords)
+    console.log(keywords);
     await page.waitForSelector(ID.login);
     await page.type(ID.login, CRED.user);
 
@@ -124,17 +176,10 @@ const getPosts = async (page) => {
     await page.waitForNavigation();
     await cookies.saveCookies(page);
 
-    //setInterval(async () => {
-      console.log("==============================");
-      await gotoLogged(page, `${fbUrl}/groups/737377046643578/`);
-      const posts = await getPosts(page);
-      console.log(posts)
-      //console.log(filterPostsByKeywords(posts, keywords));
-      console.log("==============================");
-      await page.waitForNavigation();
-    //},  60 * 1000);
+    checkGroupsByKeywords(page, groupIds, keywords);
+    // cron.schedule('*/1 * * * *', () => {
+    //   checkGroupsByKeywords(page, groupIds, keywords);
+    // });
   }
   await login();
-  await page.waitForNavigation();
-
 })();
