@@ -75,7 +75,7 @@ const filterPostsByKeywords = (posts = [], keywords = []) => {
     }
 
     if (coincidences >= requiredKeywords.length - 1) {
-      const existCondition = remainingKeywords.some(keyword => post.content.includes(keyword));
+      const existCondition = remainingKeywords.some(keyword => post.content.toLowerCase().includes(keyword.toLowerCase()));
       if (existCondition) {
         filteredPosts.push(post);
       }
@@ -115,7 +115,6 @@ const checkGroupsByKeywords = async (page, groupIds, keywords) => {
       await gotoLogged(page, `${fbUrl}/groups/${groupId}/`);
       const posts = await getPosts(page);
       const filteredPosts = filterPostsByKeywords(posts, keywords);
-      console.log(filteredPosts);
       if (filteredPosts.length > 0) {
         await savePosts(filteredPosts);
       }
